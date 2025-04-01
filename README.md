@@ -76,6 +76,17 @@ This will begin the backup process for the server named `myserver`, using its sp
 - `1`: Configuration or directory issue
 - `3`: Lock acquisition failure
 
+## Scheduling with Cron
+
+You can schedule the backup process to run automatically using cron. For example, to run a backup every 24 hours at 1:00 AM, add the following entry to your crontab:
+
+```bash
+# Run a cron job every 24 hours at 1:00 AM
+01 01 * * * for SERVER in `ls /nas/backup/server/`; do /nas/script/remote-rsync-backup $SERVER; done
+```
+
+This cron job will loop through each server directory in `/nas/backup/server/` and execute the backup script for each one at the scheduled time.
+
 ## Notes
 
 - Ensure that `DSTPATH` is set correctly and points to the desired backup destination.
