@@ -82,7 +82,7 @@ You can schedule the backup process to run automatically using cron. For example
 
 ```bash
 # Run a cron job every 24 hours at 1:00 AM
-01 01 * * * for SERVER in `ls /nas/backup/server/`; do /nas/script/remote-rsync-backup $SERVER; done
+00 01 * * * for SERVER in `ls /nas/backup/server/`; do /nas/script/remote-rsync-backup $SERVER; done
 ```
 
 This cron job will loop through each server directory in `/nas/backup/server/` and execute the backup script for each one at the scheduled time.
