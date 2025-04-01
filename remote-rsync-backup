@@ -1,0 +1,130 @@
+#!/bin/bash
+
+myname=${0##*/}
+mypath=${0%/*}
+
+myconf="${mypath}/../conf/${myname}"
+mylogdir="${mypath}/../log"
+
+
+now() {
+        echo `date +%Y%m%d.%H%M%S.%N`
+}
+
+lock() {
+        lockfile="${TEMP}/${myname}.lock"
+        waitsecs=$1 # set to "" to have an empty value while being able to set next parameters
+        maxtries=$2 # set to 0 to retry undefinetively
+        warning=$3 # set to anything to have a warning on standard output
+        try=0
+        while true ; do
+                if ( set -o noclobber ; echo "$$" > "$lockfile") 2> /dev/null ; then
+                        trap 'rm -f "$lockfile" ; exit $?' INT TERM EXIT
+                        return 0
+                else
+                        [ ! -z $warning ] && echo "`now`: Failed to acquire lockfile, it's held by pid $(cat $lockfile)"
+                        if [ ! -z $waitsecs ] ; then
+                                try=$((try+1))
+                                [ ${try} -eq ${maxtries} ] && exit 3 || sleep $waitsecs
+                        else
+                                exit 3
+                        fi
+                fi
+        done
+}
+
+unlock() {
+        rm -f "$lockfile"
+        trap - INT TERM EXIT
+}
+
+if [ ! -d ${mylogdir} ] ; then
+        mkdir -p ${mylogdir} ; ret=$?
+        if [ ${ret} != 0 ] ; then
+                echo "Can not create log directory '${mylogdir}'... exiting..."
+                exit 1
+        fi
+fi
+
+exec >>"${mylogdir}/${myname}.out" 2>>"${mylogdir}/${myname}.err"
+
+readConfig() {
+	if [ ! -f ${myconf} ] ; then
+		echo "My config file '${myconf}' does not exist... exiting..."
+		exit 1
+	else
+		. ${myconf}
+	fi
+}
+
+readConfig
+
+lock "" 0 yes
+
+server=$1
+dirconf=${SERVERSCONFDIR}/${server}
+if [ ! -d ${dirconf} ] ; then
+	echo "Server config directory '${dirconf}' does not exist... exiting..."
+	exit 1
+fi
+
+#echo $myconf - $dirconf
+
+include=${dirconf}/include
+exclude=${dirconf}/exclude
+echo $include
+if [ ! -f ${include} ] ; then
+	echo "Include file in config directory '${dirconf}' does not exist... exiting..."
+	exit 1
+fi
+
+if [ -f ${exclude} ] ; then
+	exclude="--exclude-from=${exclude}"
+else
+	exclude=""
+fi
+
+mkdir -p ${mylogdir}/${myname}
+
+NOW=`now`
+
+[[ ! ${DSTPATH} == /nas/backup* ]] && exit 1
+
+docker run --rm \
+    -u root \
+    --name=rsync \
+    --env TZ='Europe/Rome' \
+    --volume ~/.ssh:/root/.ssh \
+    --volume ${DSTPATH}:${DSTPATH} \
+    --volume ${include}:${include} \
+    alpine:latest \
+    apk add --no-cache rsync openssh-client && \
+    rsync --delete -PSHarv \
+    --files-from=${include} ${exclude} \
+     ${REMOTEUSER}@${server}:/ ${DSTPATH}/${server}/${base} \
+    2>${mylogdir}/${myname}/${server}.${NOW}.err >${mylogdir}/${myname}/${server}.${NOW}.out
+
+## test:
+# sh -c "while true; do sleep 3600; done"
+
+exit
+
+while read srcpath ; do
+	base=${srcpath%${srcpath#/*/}}
+	echo $server - $srcpath - $base
+	mkdir -p ${DSTPATH}/${server}/${base}
+	#rsync -n -PSHAav ${exclude} ${REMOTEUSER}@${server}:${srcpath} ${DSTPATH}/${server}/${base}
+done < $include
+
+[ "${SRCPATH}" == "" ] && exit 1
+[ "${DSTPATH}" == "" ] && exit 1
+
+for path in ${SRCPATH} ; do
+	base=${path%${path#/*/}}
+	echo $SRCPATH - $base
+	#mkdir -p ${DSTPATH}/${base}
+	#rsync --delete -PSHAav ${path} ${DSTPATH}/${path}
+done
+
+
+
