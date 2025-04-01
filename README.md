@@ -39,7 +39,7 @@ Running `rsync` within a Docker container offers several advantages:
 To run the backup process for a specific server, use the following command:
 
 ```bash
-./remote-rsync-backup <server_name>
+./script/remote-rsync-backup <server_name>
 ```
 Where `<server_name>` corresponds to the configuration file for the desired server.
 
