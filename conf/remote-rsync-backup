@@ -1,0 +1,3 @@
+DSTPATH="/nas/backup/server"
+REMOTEUSER="userbackup"
+SERVERSCONFDIR="/nas/conf/toolsbackup.d"
